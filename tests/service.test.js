@@ -83,7 +83,8 @@ test('before a draft starts, captain and class views show setup; admin needs the
 })
 
 test('admin actions refuse a missing PIN setup and a wrong PIN', () => {
-  assert.throws(() => setup({ pin: '' }).service.getState('admin', ''), /setAdminPin/)
+  // The message has to name something the teacher can actually find in the Sheet.
+  assert.throws(() => setup({ pin: '' }).service.getState('admin', ''), /Team Draft > Set admin PIN/)
   const { service } = started()
   assert.throws(() => service.act('9999', { type: 'spin' }), /Wrong PIN/)
 })

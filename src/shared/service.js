@@ -23,7 +23,7 @@ const ADMIN_ACTIONS = ['spin', 'respin', 'captain', 'uncaptain', 'reject', 'pick
 export function createService(store, random = Math.random, now = () => new Date()) {
   function checkPin(pin) {
     const expected = store.getPin()
-    if (!expected) throw new Error('No admin PIN is set yet. In the Apps Script editor, run setAdminPin.')
+    if (!expected) throw new Error('No admin PIN is set yet. In the Sheet, choose Team Draft > Set admin PIN.')
     if (String(pin) !== String(expected)) throw new Error('Wrong PIN.')
   }
 
