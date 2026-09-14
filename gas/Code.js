@@ -299,6 +299,9 @@ function onOpen() {
     .addItem('Set proxy secret…', 'menuSetProxySecret')
     .addItem('Add fake students for testing', 'menuAddFakeStudents')
     .addItem('Refresh cached data', 'menuClearCache')
+    .addSeparator()
+    .addItem('End the current draft', 'menuEndDraft')
+    .addItem('Clear test data…', 'menuClearTestData')
     .addToUi()
 }
 
@@ -483,10 +486,75 @@ function menuSetProxySecret() {
 
 function menuClearCache() {
   var ui = SpreadsheetApp.getUi()
-  var cache = CacheService.getScriptCache()
-  var draft = JSON.parse(PropertiesService.getScriptProperties().getProperty('ACTIVE_DRAFT') || 'null')
-  cache.removeAll(['roster', 'columns', 'draft'].concat(draft ? ['log:' + draft.id] : []))
+  clearCaches_(activeDraft_())
   ui.alert('Cached data cleared. Open screens will pick up Sheet changes within a few seconds.')
+}
+
+function activeDraft_() {
+  return JSON.parse(PropertiesService.getScriptProperties().getProperty('ACTIVE_DRAFT') || 'null')
+}
+
+// The roster is cached for a minute, but the draft and its pick log are cached for
+// six hours, so a Sheet edit is invisible until these are dropped.
+function clearCaches_(draft) {
+  CacheService.getScriptCache().removeAll(['roster', 'columns', 'draft'].concat(draft ? ['log:' + draft.id] : []))
+}
+
+// The draft lives in Script Properties, not in the Sheet. Deleting rows from
+// Students or Picks leaves it running, which is why clearing the cache alone
+// makes it reappear: the cache refills from the property.
+function menuEndDraft() {
+  var ui = SpreadsheetApp.getUi()
+  var draft = activeDraft_()
+  if (!draft) {
+    ui.alert('No draft is running', 'Nothing to end. The screens are already showing the setup view.', ui.ButtonSet.OK)
+    return
+  }
+  var answer = ui.alert(
+    'End the current draft?',
+    'Period ' + draft.period + ', ' + draft.studentIds.length + ' students.\n\n' +
+      'Every screen goes back to the setup view. Rows already written to Picks and Teams stay where they are.',
+    ui.ButtonSet.YES_NO,
+  )
+  if (answer !== ui.Button.YES) return
+  PropertiesService.getScriptProperties().deleteProperty('ACTIVE_DRAFT')
+  clearCaches_(draft)
+  ui.alert('Draft ended. Open screens return to setup within a few seconds.')
+}
+
+// For rehearsals: puts the Sheet back to "no roster, no draft" in one step.
+function menuClearTestData() {
+  var ui = SpreadsheetApp.getUi()
+  var answer = ui.alert(
+    'Clear test data?',
+    'Empties Students, Picks and Teams below their headers, and ends any draft.\n\n' +
+      'Form responses, Columns and Periods are left alone. This cannot be undone.',
+    ui.ButtonSet.YES_NO,
+  )
+  if (answer !== ui.Button.YES) return
+
+  var draft = activeDraft_()
+  PropertiesService.getScriptProperties().deleteProperty('ACTIVE_DRAFT')
+
+  var ss = SpreadsheetApp.getActive()
+  var cleared = []
+  ;['Students', 'Picks', 'Teams'].forEach(function (name) {
+    var sheet = ss.getSheetByName(name)
+    if (!sheet) return
+    var rows = sheet.getLastRow() - 1
+    if (rows <= 0) return
+    // deleteRows, not clearContent: a cleared-but-present row still counts toward
+    // getLastRow, and "Add fake students" refuses to run on a non-empty tab.
+    sheet.deleteRows(2, rows)
+    cleared.push('  ' + name + ': ' + rows + ' row' + (rows === 1 ? '' : 's'))
+  })
+
+  clearCaches_(draft)
+  ui.alert(
+    'Test data cleared',
+    (cleared.length ? cleared.join('\n') : '  Nothing to clear.') + (draft ? '\n  Ended the Period ' + draft.period + ' draft.' : ''),
+    ui.ButtonSet.OK,
+  )
 }
 
 function menuAddFakeStudents() {
