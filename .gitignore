@@ -10,3 +10,4 @@ dist-gas
 .env
 .env*.local
 .vercel
+.env*

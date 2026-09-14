@@ -159,9 +159,11 @@ Sheet while screens are open, **Refresh cached data** makes them pick up the cha
 
 After later changes, run `npm run push`, then use **Deploy → Manage deployments → Edit → New version**.
 
-The `/exec` URL still serves the app directly if you open it, which is a useful
-fallback if Vercel is ever down. Note that with "Anyone" access that page is
-public, so treat the URL as a secret.
+The `/exec` URL deliberately does **not** serve the app — opening it shows a one-line
+notice. Because the deployment accepts anonymous requests, a page served from there
+could call `getState('class')` through `google.script.run` and read real student names
+without ever presenting the proxy secret, which only guards `doPost`. The app is served
+by Vercel; this URL is the data connection only. Still treat it as a secret.
 
 ## Hosting on Vercel
 

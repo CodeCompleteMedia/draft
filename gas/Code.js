@@ -22,10 +22,17 @@ var ROSTER_CACHE_SECONDS = 60
 
 // ---- Web app ----
 
+// Deliberately does not serve the app.
+//
+// This deployment has to accept anonymous requests so the Vercel function can
+// reach it, and a page served from here could call getState('class') straight
+// through google.script.run — which returns real student names — without ever
+// presenting the proxy secret. The secret only guards doPost. So the only way
+// in is doPost, and the app is served by Vercel.
 function doGet() {
-  return HtmlService.createHtmlOutputFromFile('index')
-    .setTitle('Team Draft Day')
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+  return HtmlService.createHtmlOutput('<p>Team Draft Day runs at the app URL. This address is the data connection only.</p>').setTitle(
+    'Team Draft Day',
+  )
 }
 
 // JSON API for the Vercel-hosted front end. The web app is deployed
