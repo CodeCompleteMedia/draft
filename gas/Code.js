@@ -20,6 +20,10 @@
 var LOG_CACHE_SECONDS = 21600
 var ROSTER_CACHE_SECONDS = 60
 
+// How many fake students "Add fake students for testing" creates, per period.
+// Matches the real class sizes so a dry run behaves like draft day.
+var FAKE_STUDENTS = { 1: 13, 2: 22, 5: 22 }
+
 // ---- Web app ----
 
 // Deliberately does not serve the app.
@@ -467,9 +471,15 @@ function menuAddFakeStudents() {
     ui.alert('The Students tab already has data. Add fake students to a copy of the Sheet instead.')
     return
   }
-  var rows = sampleRows({ 1: 28 }, Math.random)
+  var rows = sampleRows(FAKE_STUDENTS, Math.random)
   sheet.getRange(1, 1, 1, SAMPLE_HEADER.length).setValues([SAMPLE_HEADER]).setFontWeight('bold')
   sheet.getRange(2, 1, rows.length, SAMPLE_HEADER.length).setValues(rows)
   CacheService.getScriptCache().removeAll(['roster', 'columns'])
-  ui.alert('Added 28 fake students in period 1. Now run Team Draft > Set up draft tabs.')
+
+  // Counted from what was written, not typed into the message, so changing
+  // FAKE_STUDENTS can't leave the alert claiming a number that isn't true.
+  var breakdown = Object.keys(FAKE_STUDENTS).map(function (period) {
+    return FAKE_STUDENTS[period] + ' in period ' + period
+  })
+  ui.alert('Added ' + rows.length + ' fake students (' + breakdown.join(', ') + '). Now run Team Draft > Set up draft tabs.')
 }
