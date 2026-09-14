@@ -19,7 +19,7 @@ const KINDS = [
 
 const KIND_ORDER = ['personality', 'eskills', 'traits']
 
-const text = (v) => String(v == null ? '' : v).trim()
+const cellText = (v) => String(v == null ? '' : v).trim()
 const isTimestamp = (h) => /^timestamp\b/i.test(h)
 
 // tabs: [{ name, header, rows }]
@@ -28,7 +28,7 @@ export function classifySources(tabs) {
   const notes = []
 
   KINDS.forEach(({ kind, label, matches }) => {
-    const found = tabs.filter((t) => t.header.some(Boolean) && matches(t.header.map(text)))
+    const found = tabs.filter((t) => t.header.some(Boolean) && matches(t.header.map(cellText)))
     if (!found.length) {
       notes.push('No tab holds the ' + label + ' answers.')
       return
@@ -48,22 +48,22 @@ export function classifySources(tabs) {
 
 // One record per submission, newest last, so a resubmission overwrites the earlier try.
 function recordsFrom(tab) {
-  const header = tab.header.map(text)
+  const header = tab.header.map(cellText)
   const col = findCoreColumns(header)
   if (col.id === -1 || col.period === -1) return []
   const stamp = header.findIndex(isTimestamp)
 
   return tab.rows
     .map((row, order) => {
-      const first = col.first !== -1 ? text(row[col.first]) : ''
-      const last = col.last !== -1 ? text(row[col.last]) : ''
-      const whole = col.name !== -1 ? text(row[col.name]).split(' ') : []
+      const first = col.first !== -1 ? cellText(row[col.first]) : ''
+      const last = col.last !== -1 ? cellText(row[col.last]) : ''
+      const whole = col.name !== -1 ? cellText(row[col.name]).split(' ') : []
       return {
-        email: text(row[col.id]).toLowerCase(),
+        email: cellText(row[col.id]).toLowerCase(),
         first: first || whole[0] || '',
         last: last || whole.slice(1).join(' '),
-        period: normalizePeriod(text(row[col.period])),
-        at: stamp === -1 ? '' : text(row[stamp]),
+        period: normalizePeriod(cellText(row[col.period])),
+        at: stamp === -1 ? '' : cellText(row[stamp]),
         order,
         row,
         core: col,
@@ -90,7 +90,7 @@ export function mergeStudents(tabs) {
   const fields = []
   present.forEach((kind) => {
     const tab = sources[kind]
-    const head = tab.header.map(text)
+    const head = tab.header.map(cellText)
     const col = findCoreColumns(head)
     const core = [col.id, col.name, col.first, col.last, col.period]
     head.forEach((name, i) => {
