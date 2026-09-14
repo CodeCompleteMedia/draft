@@ -149,7 +149,10 @@ Sheet while screens are open, **Refresh cached data** makes them pick up the cha
    ```
 
    `npm run push` builds the app, copies it and the shared draft code into `gas/`, and uploads everything.
-4. In the Apps Script editor, go to **Deploy → New deployment → Web app**.
+4. In the Apps Script editor, go to **Deploy → New deployment → Web app**. Do this in
+   the editor, **not** with `clasp deploy` — a CLI-created deployment does not reliably
+   pick up the `webapp` settings from `appsscript.json`, and silently answers every
+   request with a Drive "Access Denied" page even though the manifest looks right.
    Set "Execute as: Me" and "Who has access: Anyone". The front end is hosted on
    Vercel and calls this URL server-to-server, with no Google identity to present,
    so it has to answer anonymous requests. What guards it is the proxy secret in
@@ -211,6 +214,14 @@ likelihood:
    makes it invisible to the serverless function. These two must have no prefix.
 
 ### What to know before draft day
+
+- **Apps Script needs a `User-Agent`.** A POST without one gets an intermittent 404
+  HTML page from Google — about one request in five. Node's `fetch` sends none by
+  default, so `api/gas.js` sets one explicitly. Don't remove it.
+- **Reads retry, writes don't.** Apps Script can answer with a 404 page *after*
+  `doPost` has already run, so retrying `act`, `submitPick`, or `startDraft` would
+  apply the action twice and corrupt the pick log. Only `getVersion`, `getState`,
+  and `checkPin` are retried.
 
 - **Rotating the secret locks things out.** Running **Set proxy secret** again
   invalidates the old value; every call fails with "Not authorized" until Vercel's

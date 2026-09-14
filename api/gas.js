@@ -7,6 +7,18 @@
 
 const ALLOWED = new Set(['getVersion', 'getState', 'checkPin', 'startDraft', 'act', 'submitPick'])
 
+// Safe to send twice. Apps Script sometimes answers a POST with a 404 HTML page
+// even though doPost already ran, so a retry can double-apply anything that
+// writes. These three only read, so they can be retried; act, submitPick and
+// startDraft append to the pick log and must not be.
+const IDEMPOTENT = new Set(['getVersion', 'getState', 'checkPin'])
+
+// Requests with no User-Agent get an intermittent 404 from Google — roughly one
+// in five in testing, which at a 1.5s poll would be constant errors on the
+// projector. Node's fetch sends no User-Agent by default; curl does, which is
+// why this only showed up against the real deployment.
+const USER_AGENT = 'team-draft-day-proxy'
+
 // Calls that carry the admin PIN. A wrong PIN on one of these counts against the
 // caller's budget below.
 const PIN_CALLS = new Set(['checkPin', 'startDraft', 'act', 'getState'])
@@ -30,6 +42,34 @@ function recordFailure(ip) {
   const hits = failures.get(ip) || []
   hits.push(Date.now())
   failures.set(ip, hits)
+}
+
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+async function callAppsScript(execUrl, body, attempts) {
+  let last = null
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    if (attempt) await wait(150 * attempt)
+    let upstream
+    try {
+      upstream = await fetch(execUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'User-Agent': USER_AGENT },
+        body: JSON.stringify(body),
+      })
+    } catch (err) {
+      last = { reason: 'Could not reach the Apps Script backend.', detail: err.message }
+      continue
+    }
+    const text = await upstream.text()
+    try {
+      return { payload: JSON.parse(text) }
+    } catch {
+      // Apps Script answers auth and deployment problems with an HTML page.
+      last = { reason: 'The Apps Script backend did not return JSON. Check the deployment.', status: upstream.status, detail: text.slice(0, 300) }
+    }
+  }
+  return { failure: last }
 }
 
 export default async function handler(req, res) {
@@ -68,24 +108,10 @@ export default async function handler(req, res) {
     return res.status(429).json({ ok: false, error: 'Too many wrong PINs. Wait a few minutes.' })
   }
 
-  let payload
-  try {
-    const upstream = await fetch(execUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ secret, fn, args }),
-    })
-    const text = await upstream.text()
-    try {
-      payload = JSON.parse(text)
-    } catch {
-      // Apps Script answers auth and deployment problems with an HTML page.
-      console.error('Non-JSON from Apps Script:', upstream.status, text.slice(0, 300))
-      return res.status(502).json({ ok: false, error: 'The Apps Script backend did not return JSON. Check the deployment.' })
-    }
-  } catch (err) {
-    console.error('Apps Script request failed:', err)
-    return res.status(502).json({ ok: false, error: 'Could not reach the Apps Script backend.' })
+  const { payload, failure } = await callAppsScript(execUrl, { secret, fn, args }, IDEMPOTENT.has(fn) ? 3 : 1)
+  if (failure) {
+    console.error('Apps Script call failed:', fn, failure.status || '', failure.detail || '')
+    return res.status(502).json({ ok: false, error: failure.reason })
   }
 
   if (guarded && payload.ok === false && /PIN/i.test(payload.error || '')) recordFailure(ip)

@@ -28,14 +28,19 @@ function mockReq(body, { method = 'POST', ip = '10.0.0.1' } = {}) {
 }
 
 // Captures what the route sent upstream and replies with whatever the test wants.
+// Pass an array to give a different answer to each attempt; the last one repeats.
 function stubFetch(reply) {
   const calls = []
+  const queue = Array.isArray(reply) ? [...reply] : null
   global.fetch = async (url, options) => {
-    calls.push({ url, body: JSON.parse(options.body) })
-    return reply
+    calls.push({ url, body: JSON.parse(options.body), headers: options.headers })
+    if (!queue) return reply
+    return queue.length > 1 ? queue.shift() : queue[0]
   }
   return calls
 }
+
+const htmlReply = (status) => ({ status, text: async () => '<!DOCTYPE html><html>Page Not Found</html>' })
 
 const jsonReply = (payload) => ({ status: 200, text: async () => JSON.stringify(payload) })
 
@@ -49,6 +54,34 @@ test('forwards an allowed call with the secret attached', async () => {
   assert.deepEqual(calls[0].body, { secret: 'test-secret', fn: 'getVersion', args: [] })
   assert.equal(res.statusCode, 200)
   assert.deepEqual(res.body, { ok: true, result: 'P1-2026:7' })
+})
+
+test('always sends a User-Agent', async () => {
+  // Without one, Google answers a POST with an intermittent 404 HTML page.
+  const calls = stubFetch(jsonReply({ ok: true, result: 'none' }))
+  await handler(mockReq({ fn: 'getVersion', args: [] }), mockRes())
+  assert.ok(calls[0].headers['User-Agent'], 'a User-Agent header must be set')
+})
+
+test('a read that comes back as HTML is retried, and the retry can succeed', async () => {
+  const calls = stubFetch([htmlReply(404), jsonReply({ ok: true, result: 'P1-2026:4' })])
+  const res = mockRes()
+  await handler(mockReq({ fn: 'getVersion', args: [] }), res)
+  assert.equal(calls.length, 2)
+  assert.equal(res.statusCode, 200)
+  assert.deepEqual(res.body, { ok: true, result: 'P1-2026:4' })
+})
+
+test('a write is never retried, because doPost may already have run', async () => {
+  // Apps Script can answer with a 404 page after the pick log was appended to.
+  // Sending it again would apply the action twice and corrupt the draft.
+  for (const fn of ['act', 'submitPick', 'startDraft']) {
+    const calls = stubFetch(htmlReply(404))
+    const res = mockRes()
+    await handler(mockReq({ fn, args: ['123456', { type: 'spin' }] }), res)
+    assert.equal(calls.length, 1, `${fn} must be sent exactly once`)
+    assert.equal(res.statusCode, 502)
+  }
 })
 
 test('the browser never has to know the secret or the exec URL', async () => {
