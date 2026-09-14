@@ -28,6 +28,64 @@ function doGet() {
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
 }
 
+// JSON API for the Vercel-hosted front end. The web app is deployed
+// ANYONE_ANONYMOUS so a Vercel serverless function can reach it without a Google
+// identity, so PROXY_SECRET is what actually guards it. Only Vercel knows the
+// secret; it never reaches the browser. Set it from Team Draft > Set proxy secret.
+//
+// getAppUrl is deliberately not callable here: it returns this /exec URL, which
+// is the one thing that must not leak to a page. The front end builds its own
+// links from location instead.
+// A function, not a top-level value, for the same reason as tabHeaders_ below.
+function apiFunctions_() {
+  return {
+    getVersion: getVersion,
+    getState: getState,
+    checkPin: checkPin,
+    startDraft: startDraft,
+    act: act,
+    submitPick: submitPick,
+  }
+}
+
+function doPost(e) {
+  var body
+  try {
+    body = JSON.parse((e && e.postData && e.postData.contents) || '{}')
+  } catch (err) {
+    return apiError_('Bad request.')
+  }
+
+  var expected = PropertiesService.getScriptProperties().getProperty('PROXY_SECRET')
+  if (!expected) return apiError_('No PROXY_SECRET is set. Use Team Draft > Set proxy secret.')
+  if (!secretsMatch_(String(body.secret || ''), expected)) return apiError_('Not authorized.')
+
+  var fn = apiFunctions_()[body.fn]
+  if (!fn) return apiError_('Unknown function.')
+
+  try {
+    return apiJson_({ ok: true, result: fn.apply(null, body.args || []) })
+  } catch (err) {
+    return apiJson_({ ok: false, error: String((err && err.message) || err) })
+  }
+}
+
+// Compares every character so a wrong secret can't be narrowed down by timing.
+function secretsMatch_(a, b) {
+  if (a.length !== b.length) return false
+  var diff = 0
+  for (var i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  return diff === 0
+}
+
+function apiError_(message) {
+  return apiJson_({ ok: false, error: message })
+}
+
+function apiJson_(payload) {
+  return ContentService.createTextOutput(JSON.stringify(payload)).setMimeType(ContentService.MimeType.JSON)
+}
+
 // Everything below without a trailing underscore can be called from the page with
 // google.script.run. Each one goes through the shared service, which checks the
 // PIN for admin work and only returns what that view is allowed to see.
@@ -226,6 +284,7 @@ function onOpen() {
     .createMenu('Team Draft')
     .addItem('Set up draft tabs', 'menuSetUpTabs')
     .addItem('Set admin PIN…', 'menuSetPin')
+    .addItem('Set proxy secret…', 'menuSetProxySecret')
     .addItem('Add fake students for testing', 'menuAddFakeStudents')
     .addItem('Refresh cached data', 'menuClearCache')
     .addToUi()
@@ -296,12 +355,28 @@ function menuSetPin() {
   var answer = ui.prompt('Admin PIN', 'Choose a PIN for the admin view (at least 4 digits).', ui.ButtonSet.OK_CANCEL)
   if (answer.getSelectedButton() !== ui.Button.OK) return
   var pin = answer.getResponseText().trim()
-  if (!/^\d{4,}$/.test(pin)) {
-    ui.alert('The PIN needs to be at least 4 digits.')
+  if (!/^\d{6,}$/.test(pin)) {
+    ui.alert('The PIN needs to be at least 6 digits.')
     return
   }
   PropertiesService.getScriptProperties().setProperty('ADMIN_PIN', pin)
   ui.alert('Admin PIN saved.')
+}
+
+// Generates the secret the Vercel function sends with every API call. Copy it
+// into the Vercel project as GAS_PROXY_SECRET. Running this again rotates it,
+// which locks out the old value until Vercel is updated too.
+function menuSetProxySecret() {
+  var ui = SpreadsheetApp.getUi()
+  var secret = Utilities.getUuid() + Utilities.getUuid().replace(/-/g, '')
+  PropertiesService.getScriptProperties().setProperty('PROXY_SECRET', secret)
+  ui.alert(
+    'Proxy secret',
+    'Copy this into Vercel as GAS_PROXY_SECRET, then redeploy the Vercel project:\n\n' +
+      secret +
+      '\n\nUntil Vercel has it, the web app will answer every API call with "Not authorized."',
+    ui.ButtonSet.OK,
+  )
 }
 
 function menuClearCache() {

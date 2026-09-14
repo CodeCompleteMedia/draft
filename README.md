@@ -150,7 +150,61 @@ Sheet while screens are open, **Refresh cached data** makes them pick up the cha
 
    `npm run push` builds the app, copies it and the shared draft code into `gas/`, and uploads everything.
 4. In the Apps Script editor, go to **Deploy → New deployment → Web app**.
-   Set "Execute as: Me" and "Who has access: Only myself". Open the `/exec` URL
-   with `?view=admin`, `?view=class`, or `?view=captain`.
+   Set "Execute as: Me" and "Who has access: Anyone". The front end is hosted on
+   Vercel and calls this URL server-to-server, with no Google identity to present,
+   so it has to answer anonymous requests. What guards it is the proxy secret in
+   step 5 — the URL itself is never sent to a browser.
+5. In the Sheet, run **Team Draft → Set proxy secret** and copy the value it shows.
+6. Run **Team Draft → Set admin PIN** and choose at least 6 digits.
 
 After later changes, run `npm run push`, then use **Deploy → Manage deployments → Edit → New version**.
+
+The `/exec` URL still serves the app directly if you open it, which is a useful
+fallback if Vercel is ever down. Note that with "Anyone" access that page is
+public, so treat the URL as a secret.
+
+## Hosting on Vercel
+
+The front end is served by Vercel; the Sheet stays behind Apps Script. A serverless
+route (`api/gas.js`) is the only thing that talks to Apps Script — it adds the shared
+secret to every call, so neither the secret nor the `/exec` URL ever reaches the page.
+
+```
+browser → /api/gas (Vercel, holds the secret) → /exec (Apps Script) → the Sheet
+```
+
+1. Import the GitHub repo at [vercel.com/new](https://vercel.com/new). The Vite preset
+   is detected automatically: `npm run build` → `dist`.
+2. Under **Settings → Environment Variables**, add `GAS_EXEC_URL` and
+   `GAS_PROXY_SECRET` (see `.env.example`). Neither may be named `VITE_*`; those are
+   compiled into the page.
+3. Redeploy, then open `?view=admin`, `?view=class`, and `?view=captain` on the
+   Vercel URL.
+
+To run the whole thing locally against the real Sheet, copy `.env.example` to
+`.env.local` and use `npx vercel dev` instead of `npm run dev`. (`npm run dev` on
+its own always uses the fake students — it never touches the Sheet.)
+
+### Two build targets
+
+| Command | Output | Used by |
+| --- | --- | --- |
+| `npm run build` | `dist/` — normal chunked assets | Vercel |
+| `npm run build:gas` | `dist-gas/` — one inlined HTML file, copied to `gas/` | clasp / Apps Script |
+
+`npm run push` runs `build:gas` for you.
+
+### What to know before draft day
+
+- **Rotating the secret locks things out.** Running **Set proxy secret** again
+  invalidates the old value; every call fails with "Not authorized" until Vercel's
+  env var is updated and the project redeployed.
+- **Polling costs Apps Script executions.** Each screen checks `getVersion` every
+  1.5 s — about 2,000 calls per screen per class period. Three screens is
+  comfortable; that's the number to watch if you add devices.
+- **The admin PIN is the only thing protecting the admin board.** `api/gas.js`
+  cuts off an address after ten wrong PINs, but that counter lives in one
+  serverless instance's memory, so it's a speed bump, not a guarantee. Use a long PIN.
+- **If your school's Workspace blocks anonymous web apps**, step 4 won't be
+  available and this setup can't work as written — the fallback is to read the
+  Sheet from Vercel with a service account instead.

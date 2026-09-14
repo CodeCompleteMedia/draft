@@ -1,9 +1,13 @@
-// Talks to the backend. Inside Apps Script this goes through google.script.run;
-// under `npm run dev` it uses the mock backend with fake students.
+// Talks to the backend, three ways:
+//   - served by Apps Script (clasp deploy)  -> google.script.run
+//   - `npm run dev`                         -> the mock backend with fake students
+//   - served by Vercel                      -> POST /api/gas, which forwards to
+//                                              Apps Script with the shared secret
+// All three end up in the same createService() on the same Sheet.
 
 const gas = typeof google !== 'undefined' && google.script && google.script.run ? google.script : null
 
-export const isMock = !gas
+export const isMock = !gas && import.meta.env.DEV
 
 export function call(fn, ...args) {
   if (gas) {
@@ -14,7 +18,9 @@ export function call(fn, ...args) {
         [fn](...args)
     })
   }
-  if (import.meta.env.DEV) {
+  // The DEV check comes first so the production build can drop this branch, and
+  // the fake roster with it, instead of shipping it to the classroom.
+  if (import.meta.env.DEV && isMock) {
     return import('./mockBackend.js').then(
       ({ mockService }) =>
         new Promise((resolve, reject) => {
@@ -29,7 +35,27 @@ export function call(fn, ...args) {
         }),
     )
   }
-  return Promise.reject(new Error('Open this app from its Apps Script web app link.'))
+  // Outside Apps Script the page already knows its own address, and the proxy
+  // refuses getAppUrl anyway so the /exec URL can't leak into the page.
+  if (fn === 'getAppUrl') return Promise.resolve(location.origin + location.pathname)
+  return proxyCall(fn, args)
+}
+
+async function proxyCall(fn, args) {
+  let response
+  try {
+    response = await fetch('/api/gas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fn, args }),
+    })
+  } catch {
+    throw new Error('No connection to the server.')
+  }
+  const payload = await response.json().catch(() => null)
+  if (!payload) throw new Error('The server sent back something unreadable.')
+  if (!payload.ok) throw new Error(cleanMessage(payload.error))
+  return payload.result
 }
 
 function cleanMessage(err) {

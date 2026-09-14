@@ -6,3 +6,7 @@ dist
 gas/index.html
 gas/Shared.js
 .clasp.json
+dist-gas
+.env
+.env*.local
+.vercel
