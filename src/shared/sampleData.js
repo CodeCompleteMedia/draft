@@ -38,11 +38,19 @@ const FIRST = [
   'Kenji', 'Layla', 'Isaac', 'Nia', 'Ryan', 'Elena', 'Tariq', 'Chloe', 'Andre', 'Mia',
   'Samuel', 'Yara', 'Owen', 'Jasmine', 'Leo', 'Fatima', 'Eli', 'Rosa', 'Theo', 'Keisha',
   'Gabriel', 'Amara', 'Wyatt', 'Lucia', 'Jamal', 'Ruby', 'Adrian', 'Kayla', 'Joaquin', 'Destiny',
+  'Benjamin', 'Olivia', 'Xavier', 'Isabella', 'Nathan', 'Camila', 'Darius', 'Emily', 'Julian', 'Samantha',
+  'Miles', 'Naomi', 'Christian', 'Valentina', 'Dylan', 'Maya', 'Elijah', 'Bianca', 'Nolan', 'Serena',
+  'Malcolm', 'Isabel', 'Landon', 'Kiara', 'Victor', 'Madeline', 'Rafael', 'Sydney', 'Dominic', 'Alana',
+  'Trevor', 'Marisol', 'Jaden', 'Carolina', 'Brandon', 'Ariana', 'Cole', 'Vivian', 'Javier', 'Tessa',
+  'Marcus', 'Nadia', 'Connor', 'Gabriela', 'Derek', 'Melanie', 'Antonio', 'Kylie', 'Tristan', 'Selena',
 ]
 const LAST = [
   'Rodriguez', 'Nguyen', 'Johnson', 'Hernandez', 'Lee', 'Garcia', 'Vang', 'Martinez', 'Smith', 'Lopez',
   'Xiong', 'Patel', 'Brown', 'Ramirez', 'Thao', 'Kim', 'Davis', 'Flores', 'Chavez', 'Moua',
   'Singh', 'Torres', 'Wilson', 'Cruz', 'Her', 'Gonzalez', 'Jackson', 'Reyes', 'Lor', 'Sanchez',
+  'Anderson', 'Bennett', 'Campbell', 'Carter', 'Collins', 'Cooper', 'Edwards', 'Evans', 'Foster', 'Graham',
+  'Green', 'Hall', 'Harris', 'Hill', 'Howard', 'Jenkins', 'King', 'Lewis', 'Mitchell', 'Morgan',
+  'Morris', 'Nelson', 'Parker', 'Phillips', 'Robinson', 'Scott', 'Stewart', 'Taylor', 'Thomas', 'Walker',
 ]
 const ORDINALS = { 1: '1st', 2: '2nd', 3: '3rd' }
 const TYPE_LIST = Object.keys(PERSONALITY_ROLES)
