@@ -1,0 +1,8 @@
+node_modules
+dist
+*.local
+.DS_Store
+.clasprc.json
+gas/index.html
+gas/Shared.js
+.clasp.json

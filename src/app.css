@@ -1,0 +1,144 @@
+:root {
+  /* Warm sports-program paper, deep ink, one hot "on the clock" color. */
+  --paper: oklch(0.965 0.012 85);
+  --paper-2: oklch(0.93 0.015 85);
+  --paper-3: oklch(0.87 0.02 85);
+  --ink: oklch(0.21 0.025 265);
+  --ink-2: oklch(0.43 0.02 265);
+  --line: oklch(0.83 0.016 85);
+  --signal: oklch(0.66 0.2 38);
+  --signal-deep: oklch(0.52 0.19 33);
+  --signal-tint: oklch(0.91 0.05 45);
+  --field: oklch(0.38 0.1 255);
+  --gold: oklch(0.83 0.13 85);
+  --danger: oklch(0.5 0.18 27);
+  --danger-tint: oklch(0.93 0.04 27);
+
+  /* Diverging meter: cool low end, warm high end, grey midpoint, per the
+     data-visualization rules. Blue and amber stay apart under colour blindness,
+     and neither is the vermilion reserved for "on the clock". */
+  --meter-track: oklch(0.89 0.015 85);
+  --meter-low: oklch(0.45 0.11 245);
+  --meter-high: oklch(0.62 0.13 70);
+  --meter-mid: oklch(0.62 0.02 85);
+  --meter-baseline: oklch(0.72 0.02 85);
+
+  --font-display: 'Big Shoulders Display Variable', 'Arial Narrow', 'Roboto Condensed', Impact, sans-serif;
+  --font-ui: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --radius: 8px;
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+}
+
+body {
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--ink);
+  background: var(--paper);
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid var(--signal-deep);
+  outline-offset: 2px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.5rem;
+  padding: 0 1rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  color: var(--ink);
+  font-weight: 650;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 150ms var(--ease-out),
+    transform 150ms var(--ease-out);
+}
+.btn:hover:not(:disabled) {
+  background: var(--paper-2);
+}
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.btn.primary {
+  background: var(--ink);
+  color: var(--paper);
+}
+.btn.primary:hover:not(:disabled) {
+  background: oklch(0.32 0.03 265);
+}
+.btn.signal {
+  background: var(--signal-deep);
+  border-color: var(--signal-deep);
+  color: var(--paper);
+}
+.btn.signal:hover:not(:disabled) {
+  background: oklch(0.46 0.18 33);
+}
+.btn.quiet {
+  border-color: transparent;
+  background: transparent;
+}
+.btn.quiet:hover:not(:disabled) {
+  background: var(--paper-2);
+}
+.btn.big {
+  min-height: 3rem;
+  padding: 0 1.4rem;
+  font-size: 1.05rem;
+}
+
+/* Screen-reader-only text. It stays absolute so it takes no space, and every
+   element that holds one sets position: relative, so it can't escape a scrolling
+   container and stretch the page. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
