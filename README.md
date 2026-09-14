@@ -158,7 +158,7 @@ Sheet while screens are open, **Refresh cached data** makes them pick up the cha
    so it has to answer anonymous requests. What guards it is the proxy secret in
    step 5 — the URL itself is never sent to a browser.
 5. In the Sheet, run **Team Draft → Set proxy secret** and copy the value it shows.
-6. Run **Team Draft → Set admin PIN** and choose at least 6 digits.
+6. Run **Team Draft → Set admin PIN** and choose at least 5 digits.
 
 After later changes, run `npm run push`, then use **Deploy → Manage deployments → Edit → New version**.
 

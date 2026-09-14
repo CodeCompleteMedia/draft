@@ -425,11 +425,11 @@ function readFormTabs_() {
 
 function menuSetPin() {
   var ui = SpreadsheetApp.getUi()
-  var answer = ui.prompt('Admin PIN', 'Choose a PIN for the admin view (at least 4 digits).', ui.ButtonSet.OK_CANCEL)
+  var answer = ui.prompt('Admin PIN', 'Choose a PIN for the admin view (at least 5 digits).', ui.ButtonSet.OK_CANCEL)
   if (answer.getSelectedButton() !== ui.Button.OK) return
   var pin = answer.getResponseText().trim()
-  if (!/^\d{6,}$/.test(pin)) {
-    ui.alert('The PIN needs to be at least 6 digits.')
+  if (!/^\d{5,}$/.test(pin)) {
+    ui.alert('The PIN needs to be at least 5 digits.')
     return
   }
   PropertiesService.getScriptProperties().setProperty('ADMIN_PIN', pin)
