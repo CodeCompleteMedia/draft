@@ -259,7 +259,7 @@
       <div class="title">
         <span class="app">Team Draft Day</span>
         {#if hasDraft}
-          <span class="meta">Period {board.draft.period} · {Object.keys(board.people).length} students · {board.draft.numTeams} teams</span>
+          <span class="meta">{Object.keys(board.people).length} students</span>
         {/if}
       </div>
       <nav class="links">
