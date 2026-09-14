@@ -34,8 +34,12 @@ export function classifySources(tabs) {
       return
     }
     // A leftover tab from a relinked form has the same signature as the live one.
-    // The live one has the responses; failing that, the tidier one is the newer.
-    const best = found.slice().sort((a, b) => b.rows.length - a.rows.length || a.header.length - b.header.length)[0]
+    // Recency decides it: the live tab is the one collecting today's responses.
+    // Row count alone is wrong — a stale tab can hold more old rows than a freshly
+    // linked one holds new ones, and picking it silently drops every new response.
+    const best = found
+      .slice()
+      .sort((a, b) => newestAt(b) - newestAt(a) || b.rows.length - a.rows.length || a.header.length - b.header.length)[0]
     sources[kind] = best
     if (found.length > 1) {
       const others = found.filter((t) => t !== best).map((t) => '"' + t.name + '"')
@@ -44,6 +48,17 @@ export function classifySources(tabs) {
   })
 
   return { sources, notes }
+}
+
+// The most recent submission in a tab. 0 when there are no rows, or no readable
+// timestamps, which leaves the decision to the other tie-breaks.
+function newestAt(tab) {
+  const stamp = tab.header.map(cellText).findIndex(isTimestamp)
+  if (stamp === -1) return 0
+  return tab.rows.reduce((newest, row) => {
+    const at = Date.parse(cellText(row[stamp]))
+    return isNaN(at) ? newest : Math.max(newest, at)
+  }, 0)
 }
 
 // One record per submission, newest last, so a resubmission overwrites the earlier try.
@@ -137,6 +152,31 @@ export function mergeStudents(tabs) {
     if (count < present.length) stats.unmatched += 1
   })
   stats.total = students.length
+
+  // The same name in two periods is normally two students, and the merge treats it
+  // that way. But it is also what one student looks like after typing a different
+  // period on two forms — and then they are drafted twice, each with half a card.
+  // Worth naming, because only the teacher can tell the two cases apart.
+  const byPerson = {}
+  students.forEach((s) => {
+    const key = (s.first + '|' + s.last).toLowerCase().trim()
+    if (!key || key === '|') return
+    ;(byPerson[key] = byPerson[key] || []).push(s)
+  })
+  const split = Object.keys(byPerson).filter((key) => {
+    const group = byPerson[key]
+    return group.length > 1 && group.some((s) => s.period !== group[0].period)
+  })
+  if (split.length) {
+    stats.splitByPeriod = split.length
+    split.slice(0, 5).forEach((key) => {
+      const group = byPerson[key]
+      const who = group[0].first + ' ' + group[0].last
+      const periods = group.map((s) => s.period || '?').join(' and ')
+      notes.push('"' + who + '" appears in periods ' + periods + '. Two students, or one who typed a different period on two forms?')
+    })
+    if (split.length > 5) notes.push('...and ' + (split.length - 5) + ' more names in more than one period.')
+  }
 
   const rows = students.map((s) => {
     const out = [s.first, s.last, s.email, s.period]

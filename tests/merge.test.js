@@ -46,6 +46,25 @@ test('a relinked form leaves a stale twin; the live tab wins and it is reported'
   assert.ok(notes.some((n) => /2 tabs look like eSkills/.test(n)), notes.join(' | '))
 })
 
+test('a stale tab with MORE old rows still loses to the live tab', () => {
+  // The case that actually happened: the Sheet was copied with three old test
+  // rows, then the capture app created a fresh tab and wrote one new row to it.
+  // Going by row count picked the stale tab and silently dropped the new response.
+  const stale = tab('Slider Responses (copied)', PERSONALITY, [
+    person('9/11/2026 15:57:33', 'Matthew', 'Higley', 'matthew@google.com', '1st Period'),
+    person('9/11/2026 17:38:18', 'Romeo', 'Juliet', 'matthew_higley@mac.com', '1st Period'),
+    person('9/11/2026 18:01:06', 'Juliet', 'Romeo', 'notanem@il.com', '5th Period'),
+  ])
+  const live = tab('Slider Responses', PERSONALITY, [person('9/14/2026 12:25:06', 'Sample', 'Student', 'sample@fresnou.org', '5th Period')])
+
+  const { sources } = classifySources([stale, live])
+  assert.equal(sources.personality.name, 'Slider Responses')
+
+  const { header, rows } = mergeStudents([stale, live])
+  assert.equal(rows.length, 1)
+  assert.equal(rows[0][header.indexOf('First Name')], 'Sample')
+})
+
 test('with no responses anywhere, the tidier tab is preferred over the stale one', () => {
   const { sources } = classifySources([tab('old', ESKILLS_STALE), tab('new', ESKILLS)])
   assert.equal(sources.eskills.name, 'new')
@@ -99,6 +118,29 @@ test('same name in a different period is a different student', () => {
     ]),
   ])
   assert.equal(rows.length, 2)
+})
+
+test('one name in two periods is flagged, because only the teacher can judge it', () => {
+  // Either two different students, or one who typed a different period on two
+  // forms and would otherwise be drafted twice with half a card each.
+  const { stats, notes } = mergeStudents([
+    tab('p', PERSONALITY, [person('9/14/2026 12:25', 'Sample', 'Student', 'one@fresnou.org', '5th Period')]),
+    tab('e', ESKILLS, [eskill('9/14/2026 12:28', 'Sample', 'Student', 'two@fresnou.org', '1st', 'Reflecting', 'Analyzing Text', 'Storytelling')]),
+  ])
+  assert.equal(stats.splitByPeriod, 1)
+  assert.ok(
+    notes.some((n) => /"Sample Student" appears in periods/.test(n)),
+    notes.join(' | '),
+  )
+})
+
+test('the same name in one period, matched normally, raises no flag', () => {
+  const { stats } = mergeStudents([
+    tab('p', PERSONALITY, [person('9/14/2026 12:25', 'Sample', 'Student', 'one@fresnou.org', '1st Period')]),
+    tab('e', ESKILLS, [eskill('9/14/2026 12:28', 'Sample', 'Student', 'two@fresnou.org', '1st', 'Reflecting', 'Analyzing Text', 'Storytelling')]),
+  ])
+  assert.equal(stats.splitByPeriod, undefined)
+  assert.equal(stats.nameFallback, 1)
 })
 
 test('a resubmission replaces the earlier answer', () => {
