@@ -3,7 +3,7 @@
 // import lines are dropped and `export` keywords are stripped.
 import { readFileSync, writeFileSync } from 'node:fs'
 
-const SHARED = ['draftLogic.js', 'roster.js', 'formOptions.js', 'sampleData.js', 'views.js', 'service.js']
+const SHARED = ['draftLogic.js', 'roster.js', 'merge.js', 'formOptions.js', 'sampleData.js', 'views.js', 'service.js']
 
 const parts = SHARED.map((file) => {
   const source = readFileSync(`src/shared/${file}`, 'utf8')

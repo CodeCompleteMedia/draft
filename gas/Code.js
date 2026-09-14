@@ -290,6 +290,7 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('Team Draft')
     .addItem('Set up draft tabs', 'menuSetUpTabs')
+    .addItem('Build Students tab from forms', 'menuBuildStudents')
     .addItem('Set admin PIN…', 'menuSetPin')
     .addItem('Set proxy secret…', 'menuSetProxySecret')
     .addItem('Add fake students for testing', 'menuAddFakeStudents')
@@ -355,6 +356,71 @@ function fillPeriodsFromStudents_() {
       return [p, Math.max(2, Math.round(counts[p] / 4))]
     })
   if (rows.length) tab_('Periods').getRange(2, 1, rows.length, 2).setValues(rows)
+}
+
+// Rebuilds the Students tab from whatever form-response tabs are in this Sheet.
+// Safe to re-run: it replaces Students entirely, and Students is derived data —
+// the draft itself lives in Script Properties and the Picks tab.
+function menuBuildStudents() {
+  var ui = SpreadsheetApp.getUi()
+  var tabs = readFormTabs_()
+  if (!tabs.length) {
+    ui.alert('No form responses', 'Link your forms to this Sheet first (Responses > Select destination for responses).', ui.ButtonSet.OK)
+    return
+  }
+
+  var result
+  try {
+    result = mergeStudents(tabs)
+  } catch (err) {
+    ui.alert('Could not build Students', String(err.message || err), ui.ButtonSet.OK)
+    return
+  }
+
+  var sheet = SpreadsheetApp.getActive().getSheetByName('Students')
+  if (!sheet) sheet = SpreadsheetApp.getActive().insertSheet('Students')
+  sheet.clear()
+  sheet.getRange(1, 1, 1, result.header.length).setValues([result.header]).setFontWeight('bold')
+  if (result.rows.length) sheet.getRange(2, 1, result.rows.length, result.header.length).setValues(result.rows)
+  sheet.setFrozenRows(1)
+
+  CacheService.getScriptCache().removeAll(['roster', 'columns'])
+
+  // A fresh Columns tab needs the suggestions; an edited one is left alone.
+  var filledColumns = false
+  if (SpreadsheetApp.getActive().getSheetByName('Columns') && tab_('Columns').getLastRow() <= 1 && result.rows.length) {
+    fillColumnsFromStudents_()
+    filledColumns = true
+  }
+
+  var lines = ['Wrote ' + result.rows.length + ' students.', '']
+  result.used.forEach(function (u) {
+    lines.push('  ' + u.kind + ': "' + u.name + '"')
+  })
+  if (result.stats.unmatched) {
+    lines.push('', result.stats.unmatched + ' student(s) did not fill in every form. They are still in the draft, with blanks.')
+  }
+  if (result.stats.nameFallback) {
+    lines.push(result.stats.nameFallback + ' matched by name and period because the email differed between forms.')
+  }
+  if (result.notes.length) lines.push('', result.notes.join('\n'))
+  if (filledColumns) lines.push('', 'Filled in the Columns tab. Review the Show and Type choices.')
+
+  ui.alert('Students tab rebuilt', lines.join('\n'), ui.ButtonSet.OK)
+}
+
+// Every tab that isn't one of the app's own is a candidate form-response tab.
+function readFormTabs_() {
+  var own = tabHeaders_()
+  return SpreadsheetApp.getActive()
+    .getSheets()
+    .filter(function (sheet) {
+      return !own.hasOwnProperty(sheet.getName()) && sheet.getLastRow() > 0 && sheet.getLastColumn() > 0
+    })
+    .map(function (sheet) {
+      var values = sheet.getDataRange().getDisplayValues()
+      return { name: sheet.getName(), header: values.shift(), rows: values }
+    })
 }
 
 function menuSetPin() {
