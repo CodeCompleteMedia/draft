@@ -303,3 +303,16 @@ test("a student's Type Match check stays with the teacher and never reaches the 
   assert.ok(!captain.columns.some((c) => c.type === 'flag'), 'no check columns on the dashboard')
   for (const card of captain.cards) assert.ok(!(flagColumn.key in card.traits), 'no check values on a card')
 })
+
+test('every sample row is exactly as wide as SAMPLE_HEADER', () => {
+  // The Sheet writes these with setValues over a fixed-width range, so a single
+  // ragged row rejects the whole batch: "The data has 24 but the range has 25".
+  // The blank-personality branch had a hand-counted width that was one short, and
+  // it only fires for about one student in twenty.
+  for (let trial = 0; trial < 200; trial++) {
+    const rows = sampleRows({ 1: 28, 2: 26, 5: 30 }, Math.random)
+    for (const row of rows) {
+      assert.equal(row.length, SAMPLE_HEADER.length, `row was ${row.length} wide: ${JSON.stringify(row)}`)
+    }
+  }
+})

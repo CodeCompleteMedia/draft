@@ -86,11 +86,14 @@ export function sampleRows(counts, random) {
       // Now and then a student picks a type that doesn't match the sliders they set.
       const picked = random() < 0.12 ? TYPE_LIST[Math.floor(random() * TYPE_LIST.length)] : type
       const asShown = values.map((v, s) => (v <= 50 ? 100 - v : v) + '% ' + SIDE_WORDS[s][v <= 50 ? 0 : 1])
-      const personality =
-        random() < 0.05
-          ? new Array(14).fill('')
-          : [PERSONALITY_ROLES[picked], type + '-' + letters[4], letters[4], picked, picked === type ? 'Yes' : 'No']
-              .concat(asShown, values)
+      const answered = [PERSONALITY_ROLES[picked], type + '-' + letters[4], letters[4], picked, picked === type ? 'Yes' : 'No'].concat(
+        asShown,
+        values,
+      )
+      // Blanks are counted from the answered row, never written out by hand: a
+      // hard-coded width silently goes stale the moment a column is added, and
+      // setValues then rejects the whole batch.
+      const personality = random() < 0.05 ? new Array(answered.length).fill('') : answered
 
       rows.push(
         [
