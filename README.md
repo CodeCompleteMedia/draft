@@ -194,6 +194,20 @@ its own always uses the fake students — it never touches the Sheet.)
 
 `npm run push` runs `build:gas` for you.
 
+### If it says the server is missing GAS_EXEC_URL or GAS_PROXY_SECRET
+
+The route is running but the environment variables aren't reaching it. In order of
+likelihood:
+
+1. **They were added after the last deploy.** Vercel only gives a deployment the
+   variables that existed when it was built. Saving them is not enough — redeploy
+   from **Deployments → ⋯ → Redeploy**.
+2. **They're set for the wrong environment.** Tick Production, Preview, *and*
+   Development when adding them. A `vercel.app` preview URL from a branch does not
+   read Production variables.
+3. **They're named `VITE_GAS_...`.** That prefix exposes a value to the browser and
+   makes it invisible to the serverless function. These two must have no prefix.
+
 ### What to know before draft day
 
 - **Rotating the secret locks things out.** Running **Set proxy secret** again

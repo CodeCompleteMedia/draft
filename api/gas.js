@@ -35,10 +35,27 @@ function recordFailure(ip) {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Use POST.' })
 
-  const execUrl = process.env.GAS_EXEC_URL
-  const secret = process.env.GAS_PROXY_SECRET
-  if (!execUrl || !secret) {
-    return res.status(500).json({ ok: false, error: 'The server is missing GAS_EXEC_URL or GAS_PROXY_SECRET.' })
+  const execUrl = (process.env.GAS_EXEC_URL || '').trim()
+  const secret = (process.env.GAS_PROXY_SECRET || '').trim()
+
+  // Naming the missing variable saves a round of guessing in the Vercel dashboard.
+  // Only ever reports presence, never a value.
+  const missing = [!execUrl && 'GAS_EXEC_URL', !secret && 'GAS_PROXY_SECRET'].filter(Boolean)
+  if (missing.length) {
+    console.error('Missing env:', missing.join(', '), '| env keys seen:', Object.keys(process.env).filter((k) => k.startsWith('GAS_')).join(',') || '(none)')
+    return res.status(500).json({
+      ok: false,
+      error:
+        `The server is missing ${missing.join(' and ')}. Add ${missing.length > 1 ? 'them' : 'it'} in ` +
+        'Vercel under Settings > Environment Variables, then redeploy — environment variables only ' +
+        'reach a deployment that is built after they are saved.',
+    })
+  }
+  if (!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(execUrl)) {
+    return res.status(500).json({
+      ok: false,
+      error: 'GAS_EXEC_URL does not look like an Apps Script web app URL. It must end in /exec, not /dev.',
+    })
   }
 
   const { fn, args = [] } = req.body || {}

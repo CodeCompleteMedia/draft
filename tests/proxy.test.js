@@ -133,3 +133,49 @@ test('a misconfigured server says so instead of calling out', async () => {
   assert.equal(calls.length, 0)
   process.env.GAS_PROXY_SECRET = saved
 })
+
+test('the error names which variable is missing', async () => {
+  const saved = { ...process.env }
+  delete process.env.GAS_PROXY_SECRET
+  let res = mockRes()
+  await handler(mockReq({ fn: 'getVersion', args: [] }), res)
+  assert.match(res.body.error, /GAS_PROXY_SECRET/)
+  assert.doesNotMatch(res.body.error, /GAS_EXEC_URL/)
+
+  delete process.env.GAS_EXEC_URL
+  res = mockRes()
+  await handler(mockReq({ fn: 'getVersion', args: [] }), res)
+  assert.match(res.body.error, /GAS_EXEC_URL and GAS_PROXY_SECRET/)
+
+  Object.assign(process.env, saved)
+})
+
+test('a /dev URL or a stray quote is caught before any call goes out', async () => {
+  const saved = process.env.GAS_EXEC_URL
+  const calls = stubFetch(jsonReply({ ok: true }))
+  for (const bad of [
+    'https://script.google.com/macros/s/TEST/dev',
+    '"https://script.google.com/macros/s/TEST/exec"',
+    'https://script.google.com/macros/s/TEST/exec?view=admin',
+    'script.google.com/macros/s/TEST/exec',
+  ]) {
+    process.env.GAS_EXEC_URL = bad
+    const res = mockRes()
+    await handler(mockReq({ fn: 'getVersion', args: [] }), res)
+    assert.equal(res.statusCode, 500, `${bad} should be refused`)
+    assert.match(res.body.error, /does not look like/)
+  }
+  assert.equal(calls.length, 0)
+  process.env.GAS_EXEC_URL = saved
+})
+
+test('surrounding whitespace from a copy-paste is tolerated', async () => {
+  const saved = process.env.GAS_EXEC_URL
+  process.env.GAS_EXEC_URL = '  https://script.google.com/macros/s/TEST/exec\n'
+  const calls = stubFetch(jsonReply({ ok: true, result: 'none' }))
+  const res = mockRes()
+  await handler(mockReq({ fn: 'getVersion', args: [] }), res)
+  assert.equal(res.statusCode, 200)
+  assert.equal(calls[0].url, 'https://script.google.com/macros/s/TEST/exec')
+  process.env.GAS_EXEC_URL = saved
+})
