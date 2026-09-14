@@ -320,9 +320,11 @@ function menuSetUpTabs() {
     fillColumnsFromStudents_()
     filled.push('Columns (review the Show and Type choices)')
   }
-  if (tab_('Periods').getLastRow() <= 1 && tab_('Students').getLastRow() > 1) {
-    fillPeriodsFromStudents_()
-    filled.push('Periods (4 students per team as a starting point)')
+  // Runs whenever there are students, not only on an empty tab: adding a period
+  // to the roster has to add a row, or that period has no team count to set.
+  if (tab_('Students').getLastRow() > 1) {
+    var added = fillPeriodsFromStudents_()
+    if (added.length) filled.push('Periods ' + added.join(', ') + ' (4 students per team as a starting point)')
   }
   CacheService.getScriptCache().removeAll(['roster', 'columns'])
 
@@ -349,17 +351,40 @@ function fillColumnsFromStudents_() {
   sheet.getRange(2, 6, rows.length, 1).insertCheckboxes()
 }
 
+// Adds a row for any period that has students but isn't listed yet, and leaves
+// the rows already there alone — a team count you set by hand is a decision, not
+// something to overwrite because a new period showed up.
 function fillPeriodsFromStudents_() {
   var counts = {}
   readRoster_().forEach(function (s) {
     counts[s.period] = (counts[s.period] || 0) + 1
   })
+  var sheet = tab_('Periods')
+  var listed = {}
+  sheet
+    .getDataRange()
+    .getDisplayValues()
+    .slice(1)
+    .forEach(function (r) {
+      var p = String(r[0]).trim()
+      if (p) listed[p] = true
+    })
+
   var rows = Object.keys(counts)
-    .sort()
+    .sort(function (a, b) {
+      return Number(a) - Number(b)
+    })
+    .filter(function (p) {
+      return !listed[p]
+    })
     .map(function (p) {
       return [p, Math.max(2, Math.round(counts[p] / 4))]
     })
-  if (rows.length) tab_('Periods').getRange(2, 1, rows.length, 2).setValues(rows)
+
+  if (rows.length) sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, 2).setValues(rows)
+  return rows.map(function (r) {
+    return r[0]
+  })
 }
 
 // Rebuilds the Students tab from whatever form-response tabs are in this Sheet.

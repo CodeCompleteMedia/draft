@@ -212,3 +212,52 @@ test('finishing the draft writes the teams, and later moves rewrite them', () =>
   const moved = ctx.written.rows.find((r) => r.studentId === mover)
   assert.equal(moved.team, 'Team 2')
 })
+
+test('before a draft starts, the version follows the roster', () => {
+  // The setup screen shows class sizes, and watchState only refetches when the
+  // version string changes. A constant 'none' meant adding students to the Sheet
+  // left the admin header reporting the old counts until the page was reloaded.
+  const roster = [
+    { id: 'a@x.org', name: 'A', first: 'A', last: 'A', period: '1', fields: {} },
+    { id: 'b@x.org', name: 'B', first: 'B', last: 'B', period: '1', fields: {} },
+  ]
+  const store = {
+    getRoster: () => roster,
+    getColumns: () => [],
+    getPeriodTeams: () => ({}),
+    getPin: () => '12345',
+    getDraft: () => null,
+    saveDraft: () => {},
+    getLog: () => [],
+    appendLog: () => {},
+    writeTeams: () => {},
+    withLock: (fn) => fn(),
+  }
+  const service = createService(store)
+
+  const before = service.getVersion()
+  roster.push({ id: 'c@x.org', name: 'C', first: 'C', last: 'C', period: '2', fields: {} })
+  assert.notEqual(service.getVersion(), before, 'adding a student must change the version')
+})
+
+test('the setup version matches getVersion, so screens stop refetching', () => {
+  // If getState reports a different version than getVersion, watchState sees a
+  // mismatch on every tick and downloads the whole state every 1.5 seconds.
+  const store = {
+    getRoster: () => [{ id: 'a@x.org', name: 'A', first: 'A', last: 'A', period: '1', fields: {} }],
+    getColumns: () => [],
+    getPeriodTeams: () => ({}),
+    getPin: () => '12345',
+    getDraft: () => null,
+    saveDraft: () => {},
+    getLog: () => [],
+    appendLog: () => {},
+    writeTeams: () => {},
+    withLock: (fn) => fn(),
+  }
+  const service = createService(store)
+  for (const view of ['class', 'captain']) {
+    assert.equal(service.getState(view).version, service.getVersion(), `${view} view`)
+  }
+  assert.equal(service.getState('admin', '12345').version, service.getVersion(), 'admin view')
+})

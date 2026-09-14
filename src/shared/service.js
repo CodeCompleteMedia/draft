@@ -68,19 +68,26 @@ export function createService(store, random = Math.random, now = () => new Date(
 
   function getVersion() {
     const draft = store.getDraft()
-    return draft ? draft.id + ':' + store.getLog(draft.id).length : 'none'
+    if (draft) return draft.id + ':' + store.getLog(draft.id).length
+    // Before a draft starts, the setup screen is showing the roster, so the version
+    // has to move when the roster does. Returning a constant 'none' meant the page
+    // read the counts once at load and never looked again — add students to the
+    // Sheet and the admin header kept reporting the old class sizes until reload.
+    return 'none:' + periods().map((p) => p.period + 'x' + p.count).join(',')
   }
 
   function getState(view, pin) {
     if (view === 'admin') {
       checkPin(pin)
       const loaded = load()
-      const base = loaded ? adminView(loaded) : { view: 'admin', version: 'none', phase: PHASE.SETUP }
+      // The version has to be the one getVersion reports, or watchState sees a
+      // mismatch every tick and refetches the whole state forever.
+      const base = loaded ? adminView(loaded) : { view: 'admin', version: getVersion(), phase: PHASE.SETUP }
       return Object.assign(base, { periods: periods() })
     }
     if (view !== 'captain' && view !== 'class') throw new Error('Unknown view: ' + view)
     const loaded = load()
-    if (!loaded) return { view, version: 'none', phase: PHASE.SETUP }
+    if (!loaded) return { view, version: getVersion(), phase: PHASE.SETUP }
     return view === 'captain' ? captainView(loaded) : classView(loaded)
   }
 
