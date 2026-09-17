@@ -107,7 +107,7 @@
             </div>
           {:else if item.column.type === 'scale'}
             <div class="sum-meter">
-              <Meter value={item.average} poles={item.column.poles} label={item.column.label} compact />
+              <Meter value={item.average} poles={item.column.poles} label={item.column.label} compact average />
             </div>
           {:else if item.column.type === 'personality'}
             {#if item.types.length}

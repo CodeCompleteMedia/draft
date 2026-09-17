@@ -4,24 +4,30 @@
   // A diverging meter: the fill grows from the 50% baseline toward whichever side
   // the student leans, so direction reads before the number does. Cool for the low
   // end, warm for the high end, neutral grey when it sits on the fence.
-  let { value, poles, label, compact = false } = $props()
+  //
+  // Only a team average sits on the fence. One student always leans somewhere, however
+  // slightly, so an individual meter always names the side and the percentage. The grey
+  // is reserved for `average`, where a middle reading is real information: the team has
+  // no pull either way yet, and the next pick could give it one.
+  let { value, poles, label, compact = false, average = false } = $props()
 
   let band = $derived(scaleBand(value, poles))
-  let side = $derived(band && band.band === 'Balanced' ? 'mid' : value <= 50 ? 'low' : 'high')
+  let balanced = $derived(average && band !== null && band.band === 'Balanced')
+  let side = $derived(balanced ? 'mid' : value <= 50 ? 'low' : 'high')
 </script>
 
 {#if band}
   <span class="meter" class:compact title={poles ? `${poles.low} ← → ${poles.high}` : label}>
     <span class="head">
       <span class="name">{label}</span>
-      <span class="read">{band.band === 'Balanced' ? 'Balanced' : `${band.percent}% ${band.side}`}</span>
+      <span class="read">{balanced ? 'Balanced' : `${band.percent}% ${band.side}`}</span>
     </span>
     <span class="track" aria-hidden="true">
       <span class="fill {side}" style="left: {Math.min(value, 50)}%; right: {100 - Math.max(value, 50)}%"></span>
       <span class="baseline"></span>
     </span>
     <span class="visually-hidden">
-      {label}: {band.label}{poles ? `, ${band.percent}% toward ${band.side}; the scale runs ${poles.low} to ${poles.high}` : ''}
+      {label}: {balanced ? 'Balanced' : `${band.percent}% toward ${band.side}`}{poles ? `; the scale runs ${poles.low} to ${poles.high}` : ''}
     </span>
   </span>
 {/if}

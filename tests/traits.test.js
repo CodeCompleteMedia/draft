@@ -20,6 +20,11 @@ test('a 0-100 value reads as a side, a percentage, and a strength', () => {
   assert.deepEqual(scaleBand(88, poles), { side: 'Introverted', percent: 88, band: 'Strongly', label: 'Strongly Introverted' })
   assert.equal(scaleBand(48, poles).label, 'Balanced')
   assert.equal(scaleBand(58, poles).label, 'Slightly Introverted')
+  // The band the captain's team meters go grey on: within 5 of the middle, edges included.
+  assert.equal(scaleBand(46, poles).band, 'Balanced')
+  assert.equal(scaleBand(54, poles).band, 'Balanced')
+  assert.equal(scaleBand(45, poles).band, 'Slightly')
+  assert.equal(scaleBand(55, poles).band, 'Slightly')
   assert.equal(scaleBand(null, poles), null)
 })
 
