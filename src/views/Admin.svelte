@@ -20,7 +20,7 @@
   let pinInput = $state('')
   let pinError = $state('')
   let board = $state(null)
-  let zones = $state({ pool: [], bench: [] })
+  let zones = $state({})
   let busy = $state(false)
   let message = $state(null)
   let showSetup = $state(false)
@@ -113,15 +113,11 @@
     if (next.phase === PHASE.SETUP) showSetup = false
   }
 
+  // Only the team lists can be dragged into, so only they need a local mirror for the
+  // dnd library to reorder before the server has confirmed the move.
   function buildZones(b) {
-    const z = { pool: [], bench: [] }
-    if (!b.teams) return z
-    // The student waiting on the teacher (a pending pick or the wheel's landing) sits
-    // at the top of the pool, so there's nothing to scroll for.
-    const featured = [b.pendingId, b.spunId].filter((id) => id && b.pool.includes(id))
-    z.pool = featured.concat(b.pool.filter((id) => !featured.includes(id))).map((id) => ({ id }))
-    z.bench = b.bench.map((id) => ({ id }))
-    b.teams.forEach((t) => (z[t.id] = t.members.map((id) => ({ id }))))
+    const z = {}
+    if (b.teams) b.teams.forEach((t) => (z[t.id] = t.members.map((id) => ({ id }))))
     return z
   }
 
@@ -164,7 +160,7 @@
     say(`Draft started for Period ${period}.`)
   }
 
-  // ---- Drag and drop ----
+  // ---- Drag and drop: moving a teammate from one team to another, and nothing else ----
 
   function consider(zone, event) {
     dragging = true
@@ -178,44 +174,18 @@
     else if (trigger === TRIGGERS.DROPPED_OUTSIDE_OF_ANY) resync()
   }
 
-  function whereIs(id) {
-    if (board.pool.includes(id)) return 'pool'
-    if (board.bench.includes(id)) return 'bench'
+  function teamOf(id) {
     const team = board.teams.find((t) => t.members.includes(id))
     return team ? team.id : null
   }
 
-  const isTeam = (zone) => /^T\d+$/.test(zone)
   const teamLabel = (teamId) => `Team ${teamNumber(teamId)}`
 
+  // Captains stay with their team, so they are never in a members list and never drag.
   function drop(id, to) {
-    const from = whereIs(id)
-    const name = nameOf(id)
+    const from = teamOf(id)
     if (!from || from === to) return resync()
-
-    if (from === 'pool' && isTeam(to)) {
-      if (id === board.pendingId && to === board.turnTeamId) return run({ type: 'pick', studentId: id, teamId: to })
-      say(
-        id === board.pendingId
-          ? `${name} is ${teamLabel(board.turnTeamId)}'s pick. Drop them on ${teamLabel(board.turnTeamId)}.`
-          : 'Captains draft students from the pool. To place someone by hand, move them to Not here first.',
-        'error',
-      )
-      return resync()
-    }
-    if (from === 'pool' && to === 'bench') return run({ type: 'bench', studentId: id }, `${name} moved to Not here.`)
-    if (from === 'bench' && to === 'pool') return run({ type: 'unbench', studentId: id }, `${name} is back in the pool.`)
-    if (from === 'bench' && isTeam(to)) return run({ type: 'place', studentId: id, teamId: to }, `${name} placed on ${teamLabel(to)}.`)
-    if (isTeam(from) && to === 'pool') {
-      const undo = id === board.latestPickId
-      return run(
-        { type: 'unpick', studentId: id },
-        undo ? `Pick undone. ${teamLabel(from)} is back on the clock.` : `${name} is back in the pool. Turn order didn't change.`,
-      )
-    }
-    if (isTeam(from) && to === 'bench') return run({ type: 'bench', studentId: id }, `${name} moved to Not here.`)
-    if (isTeam(from) && isTeam(to)) return run({ type: 'move', studentId: id, teamId: to }, `${name} moved to ${teamLabel(to)}.`)
-    resync()
+    run({ type: 'move', studentId: id, teamId: to }, `${nameOf(id)} moved to ${teamLabel(to)}.`)
   }
 
   // ---- Display helpers ----
@@ -232,6 +202,13 @@
     return { tag: null, tone: null }
   }
 
+  // The student waiting on the teacher (a pending pick or the wheel's landing) sits at
+  // the top of the pool, so there's nothing to scroll for.
+  let poolOrder = $derived.by(() => {
+    if (!board) return []
+    const featured = [board.pendingId, board.spunId].filter((id) => id && board.pool.includes(id))
+    return featured.concat(board.pool.filter((id) => !featured.includes(id)))
+  })
   let phase = $derived(board ? board.phase : null)
   let hasDraft = $derived(!!board && board.phase !== PHASE.SETUP)
   let holdLeft = $derived(Math.max(0, Math.ceil((holdUntil - now) / 1000)))
@@ -314,7 +291,7 @@
           {:else if phase === PHASE.PENDING_PICK}
             <p class="step">
               <strong>{teamLabel(board.turnTeamId)}</strong> picked <strong>{nameOf(board.pendingId)}</strong>
-              (#{board.people[board.pendingId].code}). Drag them onto {teamLabel(board.turnTeamId)}, or
+              (#{board.people[board.pendingId].code}).
             </p>
             <div class="actions">
               <button class="btn signal big" disabled={busy} onclick={() => run({ type: 'pick', studentId: board.pendingId, teamId: board.turnTeamId })}>Lock in pick</button>
@@ -343,18 +320,11 @@
             <h2>Pool</h2>
             <span class="count">{board.pool.length}</span>
           </div>
-          <div
-            class="zone"
-            class:empty={zones.pool.length === 0}
-            data-empty="Everyone's on a team."
-            use:dndzone={{ items: zones.pool, flipDurationMs: FLIP_MS, type: 'people', dropTargetStyle }}
-            onconsider={(e) => consider('pool', e)}
-            onfinalize={(e) => finalize('pool', e)}
-          >
-            {#each zones.pool as item (item.id)}
-              {@const t = poolTag(item.id)}
+          <div class="zone" class:empty={board.pool.length === 0} data-empty="Everyone's on a team.">
+            {#each poolOrder as id (id)}
+              {@const t = poolTag(id)}
               <div animate:flip={{ duration: FLIP_MS }}>
-                <PersonRow person={board.people[item.id]} columns={board.columns} tag={t.tag} tone={t.tone} />
+                <PersonRow person={board.people[id]} columns={board.columns} tag={t.tag} tone={t.tone} />
               </div>
             {/each}
           </div>
@@ -363,17 +333,18 @@
             <h2>Not here</h2>
             <span class="count">{board.bench.length}</span>
           </div>
-          <div
-            class="zone bench"
-            class:empty={zones.bench.length === 0}
-            data-empty="Drag absent students here. Drag them onto a team later."
-            use:dndzone={{ items: zones.bench, flipDurationMs: FLIP_MS, type: 'people', dropTargetStyle }}
-            onconsider={(e) => consider('bench', e)}
-            onfinalize={(e) => finalize('bench', e)}
-          >
-            {#each zones.bench as item (item.id)}
+          <div class="zone bench" class:empty={board.bench.length === 0} data-empty="Nobody is marked absent.">
+            {#each board.bench as id (id)}
               <div animate:flip={{ duration: FLIP_MS }}>
-                <PersonRow person={board.people[item.id]} columns={board.columns} />
+                <PersonRow
+                  person={board.people[id]}
+                  columns={board.columns}
+                  action={{
+                    label: 'Back to pool',
+                    disabled: busy || board.complete,
+                    onclick: () => run({ type: 'unbench', studentId: id }, `${nameOf(id)} is back in the pool.`),
+                  }}
+                />
               </div>
             {/each}
           </div>
@@ -382,7 +353,7 @@
         <section class="teams">
           {#each board.teams as team (team.id)}
             {@const onClock = team.id === board.turnTeamId}
-            <article class="team" class:on-clock={onClock} class:target={onClock && phase === PHASE.PENDING_PICK}>
+            <article class="team" class:on-clock={onClock}>
               <header class="team-head">
                 <span class="num">{pad(teamNumber(team.id))}</span>
                 <span class="captain">
@@ -392,7 +363,7 @@
                 <span class="size">{1 + team.members.length}</span>
               </header>
               {#if onClock}
-                <p class="flag">{phase === PHASE.PENDING_PICK ? `Drop ${nameOf(board.pendingId)} here` : 'On the clock'}</p>
+                <p class="flag">{phase === PHASE.PENDING_PICK ? `Picked ${nameOf(board.pendingId)}` : 'On the clock'}</p>
               {/if}
               <div
                 class="zone members"
@@ -597,7 +568,11 @@
   }
   .zone.bench {
     background: transparent;
-    border: 1px dashed var(--ink-2);
+    border: 1px solid var(--line);
+  }
+  .zone.members :global(.row) {
+    cursor: grab;
+    user-select: none;
   }
   .zone.empty::before {
     content: attr(data-empty);
@@ -622,11 +597,6 @@
   .team.on-clock {
     border-top-color: var(--signal-deep);
     box-shadow: 0 0 0 1px var(--signal-deep);
-  }
-  .team.target .zone {
-    background: var(--signal-tint);
-    outline: 2px dashed var(--signal-deep);
-    outline-offset: -3px;
   }
   .team.placeholder {
     background: transparent;

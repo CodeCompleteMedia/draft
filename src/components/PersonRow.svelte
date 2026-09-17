@@ -1,7 +1,8 @@
 <script>
   import { listValues, scaleBand } from '../lib/traits.js'
 
-  let { person, columns = [], tag = null, tone = null } = $props()
+  // action: an optional { label, onclick, disabled } button, e.g. "Back to pool".
+  let { person, columns = [], tag = null, tone = null, action = null } = $props()
   let open = $state(false)
 
   function traitText(column, value) {
@@ -21,6 +22,11 @@
     <span class="tag">{tag}</span>
   {/if}
   <span class="code">#{person ? person.code : '?'}</span>
+  {#if action}
+    <button type="button" class="act" disabled={action.disabled} onclick={action.onclick} onpointerdown={(e) => e.stopPropagation()}>
+      {action.label}
+    </button>
+  {/if}
   <button
     type="button"
     class="more"
@@ -45,15 +51,13 @@
 <style>
   .row {
     display: grid;
-    grid-template-columns: 1fr auto auto auto;
+    grid-template-columns: 1fr auto auto auto auto;
     align-items: center;
     gap: 0.4rem;
     padding: 0.35rem 0.4rem 0.35rem 0.6rem;
     background: var(--paper);
     border: 1px solid var(--line);
     border-radius: 6px;
-    cursor: grab;
-    user-select: none;
   }
   .row.signal {
     background: var(--signal-tint);
@@ -83,6 +87,25 @@
     font-weight: 800;
     font-size: 1.05rem;
     color: var(--ink-2);
+  }
+  .act {
+    font-size: 0.72rem;
+    font-weight: 650;
+    padding: 0.1rem 0.4rem;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: var(--paper-2);
+    color: var(--ink-2);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .act:hover:not(:disabled) {
+    border-color: var(--ink-2);
+    color: var(--ink);
+  }
+  .act:disabled {
+    opacity: 0.5;
+    cursor: default;
   }
   .more {
     width: 1.6rem;
